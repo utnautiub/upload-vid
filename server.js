@@ -1,34 +1,33 @@
 const express = require('express');
 const multer = require('multer');
 const { google } = require('googleapis');
-const fs = require('fs');
-const path = require('path');
+const stream = require('stream');
 
 const app = express();
-const upload = multer({ dest: 'uploads/' });
 
-// Cấu hình OAuth2
 const oauth2Client = new google.auth.OAuth2(
-    '166455301843-urhn6ad8e0ccv9u09uj1c9h6na0t07ad.apps.googleusercontent.com',
-    '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',
-    'https://utnautiub-upload-video.vercel.app/oauth2callback'
+    process.env.GOOGLE_OAUTH_CLIENT_ID,
+    process.env.GOOGLE_OAUTH_CLIENT_SECRET,
+    process.env.GOOGLE_OAUTH_REDIRECT_URI
 );
 
-// Đặt refresh token của bạn ở đây
 oauth2Client.setCredentials({
-    refresh_token: '1//0euN2uuhlKTXYCgYIARAAGA4SNwF-L9Iru2llDhGz5Lp4b-sYl-JVmIBBQ0f3NfMYBRhsp0eDH8_cbfVUMSG3psZxsLGV2gr6MBQ'
+    refresh_token: process.env.GOOGLE_OAUTH_REFRESH_TOKEN
 });
 
 const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
 
-app.use(express.static(path.join(__dirname)));
+const upload = multer({ storage: multer.memoryStorage() });
 
-app.post('/upload', upload.single('video'), async (req, res) => {
+app.post('/api/upload', upload.single('video'), async (req, res) => {
     if (!req.file) {
         return res.status(400).json({ message: 'Không có file nào được tải lên' });
     }
 
     try {
+        const bufferStream = new stream.PassThrough();
+        bufferStream.end(req.file.buffer);
+
         const response = await youtube.videos.insert({
             part: 'snippet,status',
             requestBody: {
@@ -37,56 +36,41 @@ app.post('/upload', upload.single('video'), async (req, res) => {
                     description: req.body.description,
                 },
                 status: {
-                    privacyStatus: 'public', // hoặc 'public', 'unlisted'
+                    privacyStatus: 'public', // hoặc 'private', 'unlisted'
                 },
             },
             media: {
-                body: fs.createReadStream(req.file.path),
+                body: bufferStream,
             },
         });
 
-        fs.unlinkSync(req.file.path);
         res.json({ message: 'Video đã được tải lên thành công', videoId: response.data.id });
     } catch (error) {
         console.error('Lỗi khi tải lên YouTube:', error);
-        res.status(500).json({ message: 'Có lỗi xảy ra khi tải lên YouTube' });
+        res.status(500).json({ message: `Có lỗi xảy ra khi tải lên YouTube: ${error.message}` });
     }
 });
 
-const PORT = 3000;
-app.listen(PORT, () => console.log(`Server đang chạy tại http://localhost:${PORT}`));
-
-// Thêm các endpoints này vào file server.js
-
-app.get('/auth', (req, res) => {
+app.get('/api/auth', (req, res) => {
     const authUrl = oauth2Client.generateAuthUrl({
-      access_type: 'offline',
-      scope: ['https://www.googleapis.com/auth/youtube.upload'],
-      prompt: 'consent'  // Điều này đảm bảo bạn luôn nhận được refresh token
+        access_type: 'offline',
+        scope: ['https://www.googleapis.com/auth/youtube.upload'],
+        prompt: 'consent'
     });
     res.redirect(authUrl);
-  });
-  
-  app.get('/oauth2callback', async (req, res) => {
+});
+
+app.get('/api/oauth2callback', async (req, res) => {
     const { code } = req.query;
     try {
-      const { tokens } = await oauth2Client.getToken(code);
-      oauth2Client.setCredentials(tokens);
-      console.log('Refresh Token:', tokens.refresh_token);
-      res.send('Xác thực thành công! Bạn có thể đóng tab này và kiểm tra console của server để lấy refresh token.');
+        const { tokens } = await oauth2Client.getToken(code);
+        oauth2Client.setCredentials(tokens);
+        console.log('Refresh Token:', tokens.refresh_token);
+        res.send('Xác thực thành công! Bạn có thể đóng tab này.');
     } catch (error) {
-      console.error('Lỗi khi lấy token:', error);
-      res.status(500).send('Có lỗi xảy ra khi xác thực');
+        console.error('Lỗi khi lấy token:', error);
+        res.status(500).send('Có lỗi xảy ra khi xác thực');
     }
-  });
-  
-  // Cập nhật xử lý lỗi trong route /upload
-  app.post('/upload', upload.single('video'), async (req, res) => {
-    // ... (giữ nguyên phần code hiện tại)
-    try {
-      // ... (giữ nguyên phần code hiện tại)
-    } catch (error) {
-      console.error('Lỗi khi tải lên YouTube:', error);
-      res.status(500).json({ message: `Có lỗi xảy ra khi tải lên YouTube: ${error.message}` });
-    }
-  });
+});
+
+module.exports = app;

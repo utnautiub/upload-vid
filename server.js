@@ -11,7 +11,7 @@ const upload = multer({ dest: 'uploads/' });
 const oauth2Client = new google.auth.OAuth2(
     '166455301843-urhn6ad8e0ccv9u09uj1c9h6na0t07ad.apps.googleusercontent.com',
     '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',
-    'http://localhost:3000/oauth2callback'
+    'https://utnautiub-upload-video.vercel.app/oauth2callback'
 );
 
 // Đặt refresh token của bạn ở đây

@@ -1,4 +1,3 @@
-require('dotenv').config();
 const express = require('express');
 const multer = require('multer');
 const { google } = require('googleapis');
@@ -10,9 +9,9 @@ const upload = multer({ dest: 'uploads/' });
 
 // Cấu hình OAuth2
 const oauth2Client = new google.auth.OAuth2(
-    process.env.GOOGLE_OAUTH_CLIENT_ID,
-    process.env.GOOGLE_OAUTH_CLIENT_SECRET,
-    process.env.GOOGLE_OAUTH_REDIRECT_URI
+    '166455301843-urhn6ad8e0ccv9u09uj1c9h6na0t07ad.apps.googleusercontent.com',
+    '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',
+    'http://localhost:3000/oauth2callback'
 );
 
 // Đặt refresh token của bạn ở đây
